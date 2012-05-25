@@ -213,13 +213,18 @@ class FixPEP8(object):
 
     def fix_e225(self, result):
         target = self.source[result['line'] - 1]
-        offset = result['column']
-        fixed = target[:offset - 1] + " " + target[offset - 1:]
+        offset = result['column'] - 1
+
+        if target[offset - 1].isalnum() and target[offset].isalnum():
+            # Something is wrong
+            return []
+
+        fixed = target[:offset] + " " + target[offset:]
 
         # Only proceed if non-whitespace characters match.
         # And make sure we don't break the indentation.
         if (fixed.replace(' ', '') == target.replace(' ', '') and
-            _get_indentation(fixed) == _get_indentation(target)):
+                _get_indentation(fixed) == _get_indentation(target)):
             self.source[result['line'] - 1] = fixed
         else:
             return []
