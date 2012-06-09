@@ -1243,10 +1243,12 @@ class Wrapper(object):
         indent_next = self.logical_line.endswith(':')
 
         indent_string = None
+        indent_any = []
         row = depth = 0
         parens = [0] * nrows
         rel_indent = [0] * nrows
         indent = [indent_level]
+        first_visual = [indent_level]
 
         for token_type, text, start, end, line in self.tokens:
             newline = row < start[0] - first_row
@@ -1258,24 +1260,47 @@ class Wrapper(object):
             if newline:
                 last_indent = start
 
-                rel_indent[row] = start[1] - indent_level
-
+                # this is where the differences start.  instead of looking at
+                # the line and determining whether the observed indent matches
+                # our expectations, we decide which type of indentation is in
+                # use at the given indent level, and return the offset.
+                # this algorithm is succeptable to "carried errors", but
+                # should through repeated runs eventually solve indentation
+                # for multi-line expressions less than PEP8_PASSES_MAX long.
+                min_hang = (8 if indent_next else 4) + indent_level
                 if depth:
                     for open_row in range(row - 1, -1, -1):
                         if parens[open_row]:
                             break
                 else:
                     open_row = 0
+
+                # we have to ignore start[1] because it might be bad,
+                # so also ignore these results.
+                rel_indent[row] = start[1] - indent_level
                 hang = rel_indent[row] - rel_indent[open_row]
 
                 d = depth
 
-                # this is where the differences start.  instead of looking at
-                # the line and determining whether the observed indent matches
-                # our expectations, we decide which type of indentation is in
-                # use at the given indent level, and return the offset.
-                min_indent = (8 if indent_next else 4) + indent_level
-                if d and hasattr(indent[d], 'add') and len(indent[d]):
+                extra_stops = set()  # allowed but probably not preferred
+
+                if ((token_type == tokenize.OP and text == '(') or
+                    token_type != tokenize.OP) and indent_string:
+                    # the "aligning string continuations" rule
+                    extra_stops.add(indent_string)
+
+                if token_type == tokenize.OP and text in ']})':
+                    if indent[depth] is None:
+                        # no visual indent seen - indent flush left with open
+                        # row indenting
+                        valid_indents[row].append(rel_indent[open_row])
+                    elif hasattr(indent[depth], "add"):
+                        # visual indenting seen
+                        valid_indents[row] += sorted(list(indent[depth]))
+                    else:
+                        valid_indents[row] = [indent[depth]]
+                else:
+                    if d and hasattr(indent[d], 'add') and len(indent[d]):
                     # visual indenting.  all levels in the set are valid, but
                     # prefer the minimum.
                     valid_indents[row] = list(sorted(indent[d]))

@@ -250,6 +250,35 @@ def foo():
         self._inner_setup(line)
         self.assertEqual(self.result, fixed)
 
+    def test_e120_combine(self):
+        #import pdb; pdb.set_trace()
+        line = """
+def foo_bar(baz, frop,
+    fizz, bang):
+    pass
+""".lstrip()
+        fixed = """
+def foo_bar(baz, frop, fizz, bang):
+    pass
+""".lstrip()
+        self._inner_setup(line)
+        self.assertEqual(self.result, fixed)
+
+    def test_e120_hang(self):
+        #import pdb; pdb.set_trace()
+        line = """
+print('l.%s\t%s\t%s\t%r' % (token[2][0], pos, tokenize.tok_name[token[0]], token[1]))
+""".lstrip()
+        fixed = """
+print(
+    'l.%s\t%s\t%s\t%r' % (
+        token[2][0], pos, tokenize.tok_name[token[0]], token[1],
+    )
+)
+""".lstrip()
+        self._inner_setup(line)
+        self.assertEqual(self.result, fixed)
+
     def test_e191(self):
         line = """
 while True:
